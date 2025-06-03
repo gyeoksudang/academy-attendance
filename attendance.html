@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>출석 체크</title>
+    <style>
+        body {
+            font-family: 'Malgun Gothic', sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            color: #333;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        .header {
+            margin-bottom: 30px;
+        }
+        .student-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .student-btn {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        .student-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+        .student-btn:active {
+            transform: translateY(0);
+        }
+        .loading {
+            color: #666;
+            font-style: italic;
+        }
+        .result {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .refresh-btn {
+            background: #17a2b8;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        .info-box {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✅ 출석 체크</h1>
+            <p>본인의 이름을 선택해주세요</p>
+            <p><small>📅 <span id="current-date"></span></small></p>
+        </div>
+
+        <div id="student-list" class="loading">
+            학생 목록을 불러오는 중...
+        </div>
+
+        <div id="result"></div>
+
+        <div class="info-box">
+            <h4>📋 출석 체크 안내</h4>
+            <ul style="text-align: left;">
+                <li>본인의 이름을 정확히 선택해주세요</li>
+                <li>수업 시작 15분 후까지는 정상 출석 처리됩니다</li>
+                <li>15분 초과시 지각 처리되며 부모님께 알림이 발송됩니다</li>
+                <li>출석 체크는 하루에 한 번만 가능합니다</li>
+            </ul>
+        </div>
+
+        <button class="refresh-btn" onclick="loadStudents()">🔄 목록 새로고침</button>
+    </div>
+
+    <script>
+        // 실제 Apps Script 웹앱 URL로 교체 필요
+        const APPS_SCRIPT_URL = 'YOUR_APPS_SCRIPT_URL_HERE';
+        
+        // 페이지 로드시 초기화
+        window.onload = function() {
+            document.getElementById('current-date').textContent = new Date().toLocaleDateString('ko-KR');
+            loadStudents();
+        };
+
+        // 학생 목록 로드
+        async function loadStudents() {
+            const listDiv = document.getElementById('student-list');
+            listDiv.innerHTML = '<div class="loading">학생 목록을 불러오는 중...</div>';
+            
+            try {
+                const response = await fetch(`${APPS_SCRIPT_URL}?action=getStudents`);
+                const data = await response.json();
+                
+                if (data.success && data.students.length > 0) {
+                    listDiv.innerHTML = `
+                        <div class="student-grid">
+                            ${data.students.map(student => `
+                                <button class="student-btn" onclick="checkAttendance('${student.name}')">
+                                    ${student.name}
+                                    <br><small>${student.classTime}</small>
+                                </button>
+                            `).join('')}
+                        </div>
+                    `;
+                } else if (data.success && data.students.length === 0) {
+                    listDiv.innerHTML = '<p>오늘 수업 예정인 학생이 없습니다.</p>';
+                } else {
+                    listDiv.innerHTML = `<p class="error">학생 목록 로드 실패: ${data.error}</p>`;
+                }
+            } catch (error) {
+                listDiv.innerHTML = `<p class="error">네트워크 오류: ${error.message}</p>`;
+            }
+        }
+
+        // 출석 체크
+        async function checkAttendance(studentName) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<div class="loading">출석 처리 중...</div>';
+            
+            try {
+                // CORS 문제 해결을 위해 GET 요청 사용
+                const response = await fetch(`${APPS_SCRIPT_URL}?action=checkAttendance&student=${encodeURIComponent(studentName)}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const resultClass = data.status === '지각' ? 'warning' : 'success';
+                    let message = data.message;
+                    
+                    if (data.status === '지각') {
+                        message += `<br>⏰ ${data.lateMinutes}분 지각 (부모님께 알림 발송됨)`;
+                    }
+                    
+                    resultDiv.innerHTML = `<div class="result ${resultClass}">${message}</div>`;
+                    
+                    // 출석 체크 완료 후 버튼 비활성화
+                    const buttons = document.querySelectorAll('.student-btn');
+                    buttons.forEach(btn => {
+                        if (btn.textContent.includes(studentName)) {
+                            btn.style.background = '#6c757d';
+                            btn.disabled = true;
+                            btn.innerHTML = btn.innerHTML.replace(studentName, studentName + ' ✅');
+                        }
+                    });
+                } else {
+                    resultDiv.innerHTML = `<div class="result error">❌ ${data.message || data.error}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="result error">❌ 출석 체크 실패: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>
