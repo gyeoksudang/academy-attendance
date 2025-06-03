@@ -29,7 +29,7 @@
 ---
 
 
-## 결과 주소
+## 📋 결과 주소
 [https://gyeoksudang.github.io/academy-attendance/]
 [https://gyeoksudang.github.io/academy-attendance/attendance]
 
