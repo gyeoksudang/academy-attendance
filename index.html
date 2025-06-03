@@ -4,10 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>학원 출석 관리 시스템</title>
-    <!-- QR 라이브러리 제거! Google QR API 사용 -->
     <style>
         body {
-            font-family: 'Malgun Gothic', sans-serif;
+            font-family: 'Malgun Gothic', Arial, sans-serif;
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
@@ -23,19 +22,30 @@
             text-align: center;
             margin-bottom: 30px;
         }
+        .date-info {
+            font-size: 24px;
+            margin: 20px 0;
+            color: #333;
+            text-align: center;
+        }
         .qr-section {
             text-align: center;
             margin: 30px 0;
             padding: 20px;
-            border: 2px dashed #ddd;
+            border: 2px dashed #007bff;
+            border-radius: 10px;
+            background: #f8f9fa;
+        }
+        .qr-container {
+            margin: 30px 0;
+            padding: 20px;
+            border: 2px solid #333;
+            display: inline-block;
+            background: white;
             border-radius: 10px;
         }
-        #qrcode {
-            margin: 20px 0;
-            min-height: 320px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        #qr-canvas {
+            margin: 10px;
         }
         .info-section {
             margin: 20px 0;
@@ -57,6 +67,19 @@
         .btn:hover {
             background: #0056b3;
         }
+        .print-btn {
+            background: #4CAF50;
+            color: white;
+            padding: 15px 30px;
+            font-size: 18px;
+            border: none;
+            cursor: pointer;
+            margin: 20px;
+            border-radius: 5px;
+        }
+        .print-btn:hover {
+            background: #45a049;
+        }
         .student-list {
             margin-top: 20px;
             max-height: 300px;
@@ -65,8 +88,20 @@
         .student-item {
             display: flex;
             justify-content: space-between;
-            padding: 10px;
+            align-items: center;
+            padding: 12px;
             border-bottom: 1px solid #eee;
+            background: white;
+            margin: 5px 0;
+            border-radius: 5px;
+        }
+        .student-name {
+            font-weight: bold;
+            color: #333;
+        }
+        .student-time {
+            color: #666;
+            font-size: 14px;
         }
         .error {
             color: #dc3545;
@@ -86,6 +121,20 @@
             color: #6c757d;
             font-style: italic;
         }
+        .usage-info {
+            margin-top: 30px;
+            padding: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+        }
+        .usage-info h3 {
+            margin-top: 0;
+            color: #495057;
+        }
+        .usage-info p {
+            margin: 10px 0;
+            line-height: 1.6;
+        }
         @media print {
             body * {
                 visibility: hidden;
@@ -99,6 +148,9 @@
                 top: 0;
                 width: 100%;
             }
+            .btn, .print-btn {
+                display: none !important;
+            }
         }
     </style>
 </head>
@@ -106,17 +158,23 @@
     <div class="container">
         <div class="header">
             <h1>📚 학원 출석 관리 시스템</h1>
-            <p>오늘 날짜: <span id="today-date"></span></p>
         </div>
 
-        <div class="qr-section print-section">
-            <h2>📱 오늘의 출석 QR 코드</h2>
-            <div id="qrcode">
-                <div class="loading">QR 코드 생성 중...</div>
+        <div class="print-section">
+            <div class="date-info" id="today-date"></div>
+            
+            <div class="qr-section">
+                <h2>📱 오늘의 출석 QR 코드</h2>
+                <div class="qr-container">
+                    <div id="qr-canvas"></div>
+                    <div style="margin-top: 10px; font-weight: bold; color: #333;">
+                        출석 체크 QR코드
+                    </div>
+                </div>
+                <div id="qr-info"></div>
+                <button class="print-btn" onclick="window.print()">🖨️ QR 코드 인쇄</button>
+                <button class="btn" onclick="generateNewQR()">🔄 새 QR 코드 생성</button>
             </div>
-            <p id="qr-info"></p>
-            <button class="btn" onclick="window.print()">🖨️ QR 코드 인쇄</button>
-            <button class="btn" onclick="generateNewQR()">🔄 새 QR 코드 생성</button>
         </div>
 
         <div class="info-section">
@@ -132,27 +190,44 @@
             <p>학생들이 QR 코드를 스캔하면 이동할 페이지:</p>
             <a href="attendance.html" target="_blank" id="attendance-link">attendance.html</a>
         </div>
+
+        <div class="usage-info">
+            <h3>📋 사용법</h3>
+            <p>1. 위 QR코드를 인쇄해서 학원 입구에 부착하세요</p>
+            <p>2. 학생들이 QR코드를 스캔하여 출석 체크합니다</p>
+            <p>3. 구글 시트에서 실시간 출석 현황을 확인할 수 있습니다</p>
+            <p>4. 15분 이상 지각시 자동으로 부모님께 알림이 발송됩니다</p>
+        </div>
     </div>
 
+    <!-- 안정적인 QR 라이브러리 사용 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script>
         // 실제 Apps Script 웹앱 URL로 교체 필요
-        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwr8QDWKhuTHGnmR8s2yzKxHkCZKaSwcCZCII7GV9Y_kOrffxLEEmx2Cx3LzmPjLpq_YA/exec';
+        const APPS_SCRIPT_URL = 'YOUR_APPS_SCRIPT_URL_HERE';
         
         let currentQRData = '';
 
         // 페이지 로드시 초기화
         window.onload = function() {
-            document.getElementById('today-date').textContent = new Date().toLocaleDateString('ko-KR');
+            // 오늘 날짜 표시
+            const today = new Date();
+            const dateStr = today.toLocaleDateString('ko-KR', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                weekday: 'long'
+            });
+            document.getElementById('today-date').textContent = dateStr;
+            
             generateQRCode();
             loadStudents();
         };
 
-        // QR 코드 생성 (Google QR API 사용 - 라이브러리 불필요!)
+        // QR 코드 생성 (안정적인 qrcodejs 라이브러리 사용)
         async function generateQRCode() {
             try {
-                // QR 로딩 상태 표시
-                document.getElementById('qrcode').innerHTML = '<div class="loading">QR 코드 생성 중...</div>';
-                
+                // QR 정보 가져오기
                 const response = await fetch(`${APPS_SCRIPT_URL}?action=getQRData`);
                 const data = await response.json();
                 
@@ -160,38 +235,49 @@
                     // QR 코드에 담을 URL (attendance.html 페이지)
                     currentQRData = window.location.href.replace('index.html', 'attendance.html');
                     
-                    // Google QR API 사용 (외부 라이브러리 없음!)
-                    const qrSize = 300;
-                    const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${qrSize}x${qrSize}&data=${encodeURIComponent(currentQRData)}&color=000000&bgcolor=ffffff&margin=10`;
+                    // 기존 QR 코드 제거
+                    document.getElementById('qr-canvas').innerHTML = '';
                     
-                    // QR 코드를 이미지로 표시
-                    document.getElementById('qrcode').innerHTML = `
-                        <img src="${qrApiUrl}" 
-                             alt="출석 체크 QR 코드" 
-                             style="width: ${qrSize}px; height: ${qrSize}px; border: 2px solid #007bff; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);"
-                             onload="this.style.opacity='1'"
-                             onerror="this.style.display='none'; this.parentNode.innerHTML='<div class=error>QR 코드 이미지 로드 실패</div>'"
-                             style="opacity: 0; transition: opacity 0.3s;">
-                    `;
+                    // QR 코드 생성 (qrcodejs 라이브러리 사용)
+                    new QRCode(document.getElementById('qr-canvas'), {
+                        text: currentQRData,
+                        width: 256,
+                        height: 256,
+                        colorDark: "#000000",
+                        colorLight: "#ffffff",
+                        correctLevel: QRCode.CorrectLevel.L  // 에러 수정 레벨 낮춤 (안정성 향상)
+                    });
                     
                     document.getElementById('qr-info').innerHTML = `
                         <div class="success">
                             <strong>✅ QR 코드 생성 완료!</strong><br>
                             <strong>생성일시:</strong> ${data.date} ${data.time}<br>
-                            <strong>QR 링크:</strong> attendance.html<br>
-                            <strong>스캔 후 이동:</strong> ${currentQRData}
+                            <strong>QR 링크:</strong> ${currentQRData}
                         </div>
                     `;
                 } else {
-                    document.getElementById('qrcode').innerHTML = '<div class="error">QR 생성 실패</div>';
                     document.getElementById('qr-info').innerHTML = 
                         `<div class="error">QR 코드 생성 실패: ${data.error}</div>`;
                 }
             } catch (error) {
                 console.error('QR 생성 오류:', error);
-                document.getElementById('qrcode').innerHTML = '<div class="error">QR 생성 오류</div>';
+                
+                // Apps Script가 응답하지 않아도 기본 QR 생성
+                currentQRData = window.location.href.replace('index.html', 'attendance.html');
+                
+                document.getElementById('qr-canvas').innerHTML = '';
+                new QRCode(document.getElementById('qr-canvas'), {
+                    text: currentQRData,
+                    width: 256,
+                    height: 256,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.L
+                });
+                
                 document.getElementById('qr-info').innerHTML = 
-                    `<div class="error">QR 코드 생성 오류: ${error.message}</div>`;
+                    `<div class="error">Apps Script 연결 오류 - 기본 QR 코드로 생성됨<br>
+                     오류: ${error.message}</div>`;
             }
         }
 
@@ -200,7 +286,7 @@
             generateQRCode();
         }
 
-        // 학생 목록 로드 (단순한 fetch, 모든 옵션 제거)
+        // 학생 목록 로드
         async function loadStudents() {
             try {
                 // 로딩 상태 표시
@@ -226,8 +312,11 @@
                             </div>
                             ${data.students.map(student => `
                                 <div class="student-item">
-                                    <span><strong>${student.name}</strong></span>
-                                    <span>${student.classTime} (${student.classDays})</span>
+                                    <div>
+                                        <div class="student-name">${student.name}</div>
+                                        <div class="student-time">${student.classDays}</div>
+                                    </div>
+                                    <div class="student-time">${student.classTime}</div>
                                 </div>
                             `).join('')}
                         `;
@@ -239,7 +328,8 @@
             } catch (error) {
                 console.error('학생 목록 오류:', error);
                 document.getElementById('student-list').innerHTML = 
-                    `<div class="error">학생 목록 로드 오류: ${error.message}</div>`;
+                    `<div class="error">학생 목록 로드 오류: ${error.message}<br>
+                     Apps Script URL이 설정되었는지 확인해주세요.</div>`;
             }
         }
     </script>
