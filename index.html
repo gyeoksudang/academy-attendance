@@ -63,6 +63,13 @@
             padding: 10px;
             border-bottom: 1px solid #eee;
         }
+        .error {
+            color: #dc3545;
+            background: #f8d7da;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
         @media print {
             body * {
                 visibility: hidden;
@@ -122,80 +129,73 @@
             loadStudents();
         };
 
-        // QR 코드 생성
-async function generateQRCode() {
-    try {
-        const response = await fetch(`${APPS_SCRIPT_URL}?action=getQRData`, {
-            method: 'GET',
-            mode: 'cors',
-            cache: 'no-cache'
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            currentQRData = window.location.href.replace('index.html', 'attendance.html');
-            
-            document.getElementById('qrcode').innerHTML = '';
-            QRCode.toCanvas(document.getElementById('qrcode'), currentQRData, {
-                width: 300,
-                height: 300,
-                colorDark: '#000000',
-                colorLight: '#ffffff'
-            });
-            
-            document.getElementById('qr-info').innerHTML = `
-                <strong>생성일시:</strong> ${data.date} ${data.time}<br>
-                <strong>QR 링크:</strong> attendance.html
-            `;
-        } else {
-            document.getElementById('qr-info').textContent = 'QR 코드 생성 실패: ' + (data.error || '알 수 없는 오류');
-        }
-    } catch (error) {
-        console.error('QR 생성 오류:', error);
-        document.getElementById('qr-info').textContent = 'QR 코드 생성 오류: ' + error.message;
-    }
-}
-
-async function loadStudents() {
-    try {
-        const response = await fetch(`${APPS_SCRIPT_URL}?action=getStudents`, {
-            method: 'GET',
-            mode: 'cors',
-            cache: 'no-cache'
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            const studentListDiv = document.getElementById('student-list');
-            
-            if (data.students.length === 0) {
-                studentListDiv.innerHTML = `<p>오늘(${data.today}) 수업 예정인 학생이 없습니다.</p>`;
-            } else {
-                studentListDiv.innerHTML = data.students.map(student => `
-                    <div class="student-item">
-                        <span><strong>${student.name}</strong></span>
-                        <span>${student.classTime} (${student.classDays})</span>
-                    </div>
-                `).join('');
+        // QR 코드 생성 (단순한 fetch, 옵션 없음)
+        async function generateQRCode() {
+            try {
+                const response = await fetch(`${APPS_SCRIPT_URL}?action=getQRData`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentQRData = window.location.href.replace('index.html', 'attendance.html');
+                    
+                    // QR 코드 생성
+                    document.getElementById('qrcode').innerHTML = '';
+                    QRCode.toCanvas(document.getElementById('qrcode'), currentQRData, {
+                        width: 300,
+                        height: 300,
+                        colorDark: '#000000',
+                        colorLight: '#ffffff'
+                    });
+                    
+                    document.getElementById('qr-info').innerHTML = `
+                        <strong>생성일시:</strong> ${data.date} ${data.time}<br>
+                        <strong>QR 링크:</strong> attendance.html
+                    `;
+                } else {
+                    document.getElementById('qr-info').innerHTML = 
+                        `<div class="error">QR 코드 생성 실패: ${data.error}</div>`;
+                }
+            } catch (error) {
+                console.error('QR 생성 오류:', error);
+                document.getElementById('qr-info').innerHTML = 
+                    `<div class="error">QR 코드 생성 오류: ${error.message}</div>`;
             }
-        } else {
-            document.getElementById('student-list').innerHTML = '학생 목록 로드 실패: ' + (data.error || '알 수 없는 오류');
         }
-    } catch (error) {
-        console.error('학생 목록 오류:', error);
-        document.getElementById('student-list').innerHTML = '학생 목록 로드 오류: ' + error.message;
-    }
-}
+
+        // 새 QR 코드 생성
+        function generateNewQR() {
+            generateQRCode();
+        }
+
+        // 학생 목록 로드 (단순한 fetch, 옵션 없음)
+        async function loadStudents() {
+            try {
+                const response = await fetch(`${APPS_SCRIPT_URL}?action=getStudents`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const studentListDiv = document.getElementById('student-list');
+                    
+                    if (data.students.length === 0) {
+                        studentListDiv.innerHTML = `<p>오늘(${data.today}) 수업 예정인 학생이 없습니다.</p>`;
+                    } else {
+                        studentListDiv.innerHTML = data.students.map(student => `
+                            <div class="student-item">
+                                <span><strong>${student.name}</strong></span>
+                                <span>${student.classTime} (${student.classDays})</span>
+                            </div>
+                        `).join('');
+                    }
+                } else {
+                    document.getElementById('student-list').innerHTML = 
+                        `<div class="error">학생 목록 로드 실패: ${data.error}</div>`;
+                }
+            } catch (error) {
+                console.error('학생 목록 오류:', error);
+                document.getElementById('student-list').innerHTML = 
+                    `<div class="error">학생 목록 로드 오류: ${error.message}</div>`;
+            }
+        }
     </script>
 </body>
 </html>
