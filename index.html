@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>학원 출석 관리 시스템</title>
-    <!-- QR 라이브러리 제거! -->
+    <!-- QR 라이브러리 제거! Google QR API 사용 -->
     <style>
         body {
             font-family: 'Malgun Gothic', sans-serif;
@@ -32,6 +32,10 @@
         }
         #qrcode {
             margin: 20px 0;
+            min-height: 320px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .info-section {
             margin: 20px 0;
@@ -48,6 +52,7 @@
             cursor: pointer;
             font-size: 16px;
             margin: 10px;
+            transition: background-color 0.3s;
         }
         .btn:hover {
             background: #0056b3;
@@ -69,6 +74,17 @@
             padding: 10px;
             border-radius: 5px;
             margin: 10px 0;
+        }
+        .success {
+            color: #155724;
+            background: #d4edda;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .loading {
+            color: #6c757d;
+            font-style: italic;
         }
         @media print {
             body * {
@@ -95,7 +111,9 @@
 
         <div class="qr-section print-section">
             <h2>📱 오늘의 출석 QR 코드</h2>
-            <div id="qrcode">QR 코드 생성 중...</div>
+            <div id="qrcode">
+                <div class="loading">QR 코드 생성 중...</div>
+            </div>
             <p id="qr-info"></p>
             <button class="btn" onclick="window.print()">🖨️ QR 코드 인쇄</button>
             <button class="btn" onclick="generateNewQR()">🔄 새 QR 코드 생성</button>
@@ -104,7 +122,7 @@
         <div class="info-section">
             <h3>👥 오늘 수업 예정 학생</h3>
             <div id="student-list" class="student-list">
-                학생 목록 로딩 중...
+                <div class="loading">학생 목록 로딩 중...</div>
             </div>
             <button class="btn" onclick="loadStudents()">🔄 학생 목록 새로고침</button>
         </div>
@@ -132,6 +150,9 @@
         // QR 코드 생성 (Google QR API 사용 - 라이브러리 불필요!)
         async function generateQRCode() {
             try {
+                // QR 로딩 상태 표시
+                document.getElementById('qrcode').innerHTML = '<div class="loading">QR 코드 생성 중...</div>';
+                
                 const response = await fetch(`${APPS_SCRIPT_URL}?action=getQRData`);
                 const data = await response.json();
                 
@@ -141,25 +162,34 @@
                     
                     // Google QR API 사용 (외부 라이브러리 없음!)
                     const qrSize = 300;
-                    const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${qrSize}x${qrSize}&data=${encodeURIComponent(currentQRData)}`;
+                    const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${qrSize}x${qrSize}&data=${encodeURIComponent(currentQRData)}&color=000000&bgcolor=ffffff&margin=10`;
                     
                     // QR 코드를 이미지로 표시
                     document.getElementById('qrcode').innerHTML = `
-                        <img src="${qrApiUrl}" alt="출석 체크 QR 코드" 
-                             style="width: ${qrSize}px; height: ${qrSize}px; border: 2px solid #007bff; border-radius: 10px;">
+                        <img src="${qrApiUrl}" 
+                             alt="출석 체크 QR 코드" 
+                             style="width: ${qrSize}px; height: ${qrSize}px; border: 2px solid #007bff; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);"
+                             onload="this.style.opacity='1'"
+                             onerror="this.style.display='none'; this.parentNode.innerHTML='<div class=error>QR 코드 이미지 로드 실패</div>'"
+                             style="opacity: 0; transition: opacity 0.3s;">
                     `;
                     
                     document.getElementById('qr-info').innerHTML = `
-                        <strong>생성일시:</strong> ${data.date} ${data.time}<br>
-                        <strong>QR 링크:</strong> attendance.html<br>
-                        <strong>스캔 후 이동:</strong> ${currentQRData}
+                        <div class="success">
+                            <strong>✅ QR 코드 생성 완료!</strong><br>
+                            <strong>생성일시:</strong> ${data.date} ${data.time}<br>
+                            <strong>QR 링크:</strong> attendance.html<br>
+                            <strong>스캔 후 이동:</strong> ${currentQRData}
+                        </div>
                     `;
                 } else {
+                    document.getElementById('qrcode').innerHTML = '<div class="error">QR 생성 실패</div>';
                     document.getElementById('qr-info').innerHTML = 
                         `<div class="error">QR 코드 생성 실패: ${data.error}</div>`;
                 }
             } catch (error) {
                 console.error('QR 생성 오류:', error);
+                document.getElementById('qrcode').innerHTML = '<div class="error">QR 생성 오류</div>';
                 document.getElementById('qr-info').innerHTML = 
                     `<div class="error">QR 코드 생성 오류: ${error.message}</div>`;
             }
@@ -170,9 +200,12 @@
             generateQRCode();
         }
 
-        // 학생 목록 로드 (기존과 동일)
+        // 학생 목록 로드 (단순한 fetch, 모든 옵션 제거)
         async function loadStudents() {
             try {
+                // 로딩 상태 표시
+                document.getElementById('student-list').innerHTML = '<div class="loading">학생 목록을 불러오는 중...</div>';
+                
                 const response = await fetch(`${APPS_SCRIPT_URL}?action=getStudents`);
                 const data = await response.json();
                 
@@ -180,11 +213,35 @@
                     const studentListDiv = document.getElementById('student-list');
                     
                     if (data.students.length === 0) {
-                        studentListDiv.innerHTML = `<p>오늘(${data.today}) 수업 예정인 학생이 없습니다.</p>`;
-                    } else {
-                        studentListDiv.innerHTML = data.students.map(student => `
-                            <div class="student-item">
-                                <span><strong>${student.name}</strong></span>
-                                <span>${student.classTime} (${student.classDays})</span>
+                        studentListDiv.innerHTML = `
+                            <div class="error">
+                                오늘(${data.today}) 수업 예정인 학생이 없습니다.<br>
+                                <small>총 ${data.totalRows}명의 학생이 등록되어 있습니다.</small>
                             </div>
-                        `).join('');
+                        `;
+                    } else {
+                        studentListDiv.innerHTML = `
+                            <div class="success">
+                                <strong>✅ 오늘(${data.today}) 수업 예정 학생: ${data.students.length}명</strong>
+                            </div>
+                            ${data.students.map(student => `
+                                <div class="student-item">
+                                    <span><strong>${student.name}</strong></span>
+                                    <span>${student.classTime} (${student.classDays})</span>
+                                </div>
+                            `).join('')}
+                        `;
+                    }
+                } else {
+                    document.getElementById('student-list').innerHTML = 
+                        `<div class="error">학생 목록 로드 실패: ${data.error}</div>`;
+                }
+            } catch (error) {
+                console.error('학생 목록 오류:', error);
+                document.getElementById('student-list').innerHTML = 
+                    `<div class="error">학생 목록 로드 오류: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>
