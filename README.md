@@ -6,9 +6,7 @@ https://gyeoksudang.github.io/academy-attendance/development-guide.html
 ## 데이터 교환 문제 해결 가이드
 https://gyeoksudang.github.io/academy-attendance/development-guide.html
 
-## 
 # 학원용 QR 코드 출석 체크 시스템 완전 구현 요청
-
 학원용 QR 코드 출석 체크 시스템을 만들고 싶어. 요구사항은 다음과 같아:
 
 ## 📋 기본 기능 요구사항
