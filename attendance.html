@@ -50,6 +50,11 @@
         .student-btn:active {
             transform: translateY(0);
         }
+        .student-btn:disabled {
+            background: #6c757d !important;
+            cursor: not-allowed;
+            transform: none;
+        }
         .loading {
             color: #666;
             font-style: italic;
@@ -91,6 +96,16 @@
             margin: 20px 0;
             text-align: left;
         }
+        .debug-info {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-size: 12px;
+            text-align: left;
+            color: #6c757d;
+        }
     </style>
 </head>
 <body>
@@ -99,6 +114,12 @@
             <h1>✅ 출석 체크</h1>
             <p>본인의 이름을 선택해주세요</p>
             <p><small>📅 <span id="current-date"></span></small></p>
+        </div>
+
+        <div id="debug-info" class="debug-info">
+            <strong>디버그 정보:</strong><br>
+            Apps Script URL: <span id="debug-url">설정 중...</span><br>
+            상태: <span id="debug-status">초기화 중...</span>
         </div>
 
         <div id="student-list" class="loading">
@@ -118,6 +139,7 @@
         </div>
 
         <button class="refresh-btn" onclick="loadStudents()">🔄 목록 새로고침</button>
+        <button class="refresh-btn" onclick="testConnection()">🔍 연결 테스트</button>
     </div>
 
     <script>
@@ -127,98 +149,207 @@
         // 페이지 로드시 초기화
         window.onload = function() {
             document.getElementById('current-date').textContent = new Date().toLocaleDateString('ko-KR');
-            loadStudents();
+            document.getElementById('debug-url').textContent = APPS_SCRIPT_URL;
+            testConnection();
         };
 
-async function loadStudents() {
-    const listDiv = document.getElementById('student-list');
-    listDiv.innerHTML = '<div class="loading">학생 목록을 불러오는 중...</div>';
-    
-    try {
-        const response = await fetch(`${APPS_SCRIPT_URL}?action=getStudents`, {
-            method: 'GET',
-            mode: 'cors',
-            cache: 'no-cache'
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        console.log('학생 목록 응답:', data);
-        
-        if (data.success && data.students.length > 0) {
-            listDiv.innerHTML = `
-                <div class="student-grid">
-                    ${data.students.map(student => `
-                        <button class="student-btn" onclick="checkAttendance('${student.name}')">
-                            ${student.name}
-                            <br><small>${student.classTime}</small>
-                        </button>
-                    `).join('')}
-                </div>
-                <p><small>오늘 수업 예정: ${data.students.length}명</small></p>
-            `;
-        } else if (data.success && data.students.length === 0) {
-            listDiv.innerHTML = '<p>오늘 수업 예정인 학생이 없습니다.</p>';
-        } else {
-            listDiv.innerHTML = `<p class="error">학생 목록 로드 실패: ${data.error || '알 수 없는 오류'}</p>`;
-        }
-    } catch (error) {
-        console.error('학생 목록 오류:', error);
-        listDiv.innerHTML = `<p class="error">네트워크 오류: ${error.message}</p>`;
-    }
-}
-
-async function checkAttendance(studentName) {
-    const resultDiv = document.getElementById('result');
-    resultDiv.innerHTML = '<div class="loading">출석 처리 중...</div>';
-    
-    try {
-        const url = `${APPS_SCRIPT_URL}?action=checkAttendance&student=${encodeURIComponent(studentName)}`;
-        console.log('출석 체크 URL:', url);
-        
-        const response = await fetch(url, {
-            method: 'GET',
-            mode: 'cors',
-            cache: 'no-cache'
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        console.log('출석 체크 응답:', data);
-        
-        if (data.success) {
-            const resultClass = data.status === '지각' ? 'warning' : 'success';
-            let message = data.message;
+        // 연결 테스트 함수
+        async function testConnection() {
+            const debugStatus = document.getElementById('debug-status');
+            debugStatus.textContent = '연결 테스트 중...';
             
-            if (data.status === '지각') {
-                message += `<br>⏰ ${data.lateMinutes}분 지각 (부모님께 알림 발송됨)`;
+            try {
+                // 가장 간단한 요청으로 테스트
+                const testUrl = `${APPS_SCRIPT_URL}?action=getQRData&_=${Date.now()}`;
+                console.log('테스트 URL:', testUrl);
+                
+                const response = await fetch(testUrl, {
+                    method: 'GET',
+                    mode: 'cors',
+                    credentials: 'omit',
+                    cache: 'no-cache',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                console.log('응답 상태:', response.status);
+                console.log('응답 헤더:', [...response.headers.entries()]);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('응답 데이터:', data);
+                    debugStatus.innerHTML = `<span style="color: green;">✅ 연결 성공</span>`;
+                    loadStudents();
+                } else {
+                    debugStatus.innerHTML = `<span style="color: red;">❌ HTTP ${response.status}</span>`;
+                }
+            } catch (error) {
+                console.error('연결 테스트 오류:', error);
+                debugStatus.innerHTML = `<span style="color: red;">❌ ${error.message}</span>`;
+                
+                // CORS 오류인 경우 대안 방법 제시
+                if (error.message.includes('CORS') || error.message.includes('Access-Control')) {
+                    showCorsErrorHelp();
+                }
+            }
+        }
+
+        // CORS 오류 도움말 표시
+        function showCorsErrorHelp() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `
+                <div class="result error">
+                    <h4>❌ CORS 오류 발생</h4>
+                    <p><strong>해결 방법:</strong></p>
+                    <ol style="text-align: left;">
+                        <li>Apps Script 코드가 올바르게 수정되었는지 확인</li>
+                        <li>Apps Script를 <strong>새로 배포</strong> (기존 배포 삭제 후)</li>
+                        <li>배포시 <strong>"모든 사용자" 권한</strong> 설정</li>
+                        <li>새 웹앱 URL을 이 HTML 파일에 적용</li>
+                    </ol>
+                    <p><small>현재 URL: ${APPS_SCRIPT_URL}</small></p>
+                </div>
+            `;
+        }
+
+        // 학생 목록 로드 (개선된 버전)
+        async function loadStudents() {
+            const listDiv = document.getElementById('student-list');
+            const debugStatus = document.getElementById('debug-status');
+            
+            listDiv.innerHTML = '<div class="loading">학생 목록을 불러오는 중...</div>';
+            debugStatus.textContent = '학생 목록 로딩 중...';
+            
+            try {
+                // 캐시 방지를 위한 타임스탬프 추가
+                const url = `${APPS_SCRIPT_URL}?action=getStudents&_=${Date.now()}`;
+                console.log('학생 목록 요청 URL:', url);
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    mode: 'cors',
+                    credentials: 'omit',
+                    cache: 'no-cache',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                console.log('학생 목록 응답 상태:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('학생 목록 데이터:', data);
+                
+                if (data.success && data.students && data.students.length > 0) {
+                    listDiv.innerHTML = `
+                        <div class="student-grid">
+                            ${data.students.map(student => `
+                                <button class="student-btn" onclick="checkAttendance('${student.name.replace(/'/g, '\\\'')}')" id="btn-${student.name}">
+                                    ${student.name}
+                                    <br><small>${student.classTime}</small>
+                                </button>
+                            `).join('')}
+                        </div>
+                        <p><small>오늘(${data.today}) 수업 예정: ${data.students.length}명</small></p>
+                    `;
+                    debugStatus.innerHTML = `<span style="color: green;">✅ 학생 ${data.students.length}명 로드됨</span>`;
+                } else if (data.success && (!data.students || data.students.length === 0)) {
+                    listDiv.innerHTML = `<p>오늘(${data.today || '?'}) 수업 예정인 학생이 없습니다.</p>`;
+                    debugStatus.innerHTML = `<span style="color: orange;">⚠️ 수업 예정 학생 없음</span>`;
+                } else {
+                    throw new Error(data.error || '학생 목록을 가져올 수 없습니다.');
+                }
+            } catch (error) {
+                console.error('학생 목록 오류:', error);
+                listDiv.innerHTML = `<p class="error">❌ 네트워크 오류: ${error.message}</p>`;
+                debugStatus.innerHTML = `<span style="color: red;">❌ ${error.message}</span>`;
+                
+                if (error.message.includes('CORS') || error.message.includes('Access-Control')) {
+                    showCorsErrorHelp();
+                }
+            }
+        }
+
+        // 출석 체크 (개선된 버전)
+        async function checkAttendance(studentName) {
+            const resultDiv = document.getElementById('result');
+            const debugStatus = document.getElementById('debug-status');
+            const studentBtn = document.getElementById(`btn-${studentName}`);
+            
+            resultDiv.innerHTML = '<div class="loading">출석 처리 중...</div>';
+            debugStatus.textContent = '출석 처리 중...';
+            
+            // 버튼 임시 비활성화
+            if (studentBtn) {
+                studentBtn.disabled = true;
+                studentBtn.style.opacity = '0.6';
             }
             
-            resultDiv.innerHTML = `<div class="result ${resultClass}">${message}</div>`;
-            
-            // 출석 체크 완료 후 버튼 비활성화
-            const buttons = document.querySelectorAll('.student-btn');
-            buttons.forEach(btn => {
-                if (btn.textContent.includes(studentName)) {
-                    btn.style.background = '#6c757d';
-                    btn.disabled = true;
-                    btn.innerHTML = btn.innerHTML.replace(studentName, studentName + ' ✅');
+            try {
+                const url = `${APPS_SCRIPT_URL}?action=checkAttendance&student=${encodeURIComponent(studentName)}&_=${Date.now()}`;
+                console.log('출석 체크 URL:', url);
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    mode: 'cors',
+                    credentials: 'omit',
+                    cache: 'no-cache',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                console.log('출석 체크 응답 상태:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
-            });
-        } else {
-            resultDiv.innerHTML = `<div class="result error">❌ ${data.error || data.message || '출석 체크 실패'}</div>`;
+                
+                const data = await response.json();
+                console.log('출석 체크 응답:', data);
+                
+                if (data.success) {
+                    const resultClass = data.status === '지각' ? 'warning' : 'success';
+                    let message = data.message;
+                    
+                    if (data.status === '지각') {
+                        message += `<br>⏰ ${data.lateMinutes}분 지각 (부모님께 알림 발송됨)`;
+                    }
+                    
+                    resultDiv.innerHTML = `<div class="result ${resultClass}">${message}</div>`;
+                    debugStatus.innerHTML = `<span style="color: green;">✅ ${studentName} 출석 완료</span>`;
+                    
+                    // 출석 체크 완료 후 버튼 상태 변경
+                    if (studentBtn) {
+                        studentBtn.style.background = '#6c757d';
+                        studentBtn.disabled = true;
+                        studentBtn.style.opacity = '1';
+                        studentBtn.innerHTML = studentBtn.innerHTML.replace(studentName, studentName + ' ✅');
+                    }
+                } else {
+                    throw new Error(data.error || data.message || '출석 체크에 실패했습니다.');
+                }
+            } catch (error) {
+                console.error('출석 체크 오류:', error);
+                resultDiv.innerHTML = `<div class="result error">❌ 출석 체크 실패: ${error.message}</div>`;
+                debugStatus.innerHTML = `<span style="color: red;">❌ 출석 실패</span>`;
+                
+                // 버튼 다시 활성화
+                if (studentBtn) {
+                    studentBtn.disabled = false;
+                    studentBtn.style.opacity = '1';
+                }
+                
+                if (error.message.includes('CORS') || error.message.includes('Access-Control')) {
+                    showCorsErrorHelp();
+                }
+            }
         }
-    } catch (error) {
-        console.error('출석 체크 오류:', error);
-        resultDiv.innerHTML = `<div class="result error">❌ 출석 체크 실패: ${error.message}</div>`;
-    }
-}
     </script>
 </body>
 </html>
