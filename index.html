@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>학원 출석 관리 시스템</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js"></script>
+    <!-- QR 라이브러리 제거! -->
     <style>
         body {
             font-family: 'Malgun Gothic', sans-serif;
@@ -95,8 +95,8 @@
 
         <div class="qr-section print-section">
             <h2>📱 오늘의 출석 QR 코드</h2>
-            <div id="qrcode"></div>
-            <p id="qr-info">QR 코드 생성 중...</p>
+            <div id="qrcode">QR 코드 생성 중...</div>
+            <p id="qr-info"></p>
             <button class="btn" onclick="window.print()">🖨️ QR 코드 인쇄</button>
             <button class="btn" onclick="generateNewQR()">🔄 새 QR 코드 생성</button>
         </div>
@@ -129,27 +129,30 @@
             loadStudents();
         };
 
-        // QR 코드 생성 (단순한 fetch, 옵션 없음)
+        // QR 코드 생성 (Google QR API 사용 - 라이브러리 불필요!)
         async function generateQRCode() {
             try {
                 const response = await fetch(`${APPS_SCRIPT_URL}?action=getQRData`);
                 const data = await response.json();
                 
                 if (data.success) {
+                    // QR 코드에 담을 URL (attendance.html 페이지)
                     currentQRData = window.location.href.replace('index.html', 'attendance.html');
                     
-                    // QR 코드 생성
-                    document.getElementById('qrcode').innerHTML = '';
-                    QRCode.toCanvas(document.getElementById('qrcode'), currentQRData, {
-                        width: 300,
-                        height: 300,
-                        colorDark: '#000000',
-                        colorLight: '#ffffff'
-                    });
+                    // Google QR API 사용 (외부 라이브러리 없음!)
+                    const qrSize = 300;
+                    const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${qrSize}x${qrSize}&data=${encodeURIComponent(currentQRData)}`;
+                    
+                    // QR 코드를 이미지로 표시
+                    document.getElementById('qrcode').innerHTML = `
+                        <img src="${qrApiUrl}" alt="출석 체크 QR 코드" 
+                             style="width: ${qrSize}px; height: ${qrSize}px; border: 2px solid #007bff; border-radius: 10px;">
+                    `;
                     
                     document.getElementById('qr-info').innerHTML = `
                         <strong>생성일시:</strong> ${data.date} ${data.time}<br>
-                        <strong>QR 링크:</strong> attendance.html
+                        <strong>QR 링크:</strong> attendance.html<br>
+                        <strong>스캔 후 이동:</strong> ${currentQRData}
                     `;
                 } else {
                     document.getElementById('qr-info').innerHTML = 
@@ -167,7 +170,7 @@
             generateQRCode();
         }
 
-        // 학생 목록 로드 (단순한 fetch, 옵션 없음)
+        // 학생 목록 로드 (기존과 동일)
         async function loadStudents() {
             try {
                 const response = await fetch(`${APPS_SCRIPT_URL}?action=getStudents`);
@@ -185,17 +188,3 @@
                                 <span>${student.classTime} (${student.classDays})</span>
                             </div>
                         `).join('');
-                    }
-                } else {
-                    document.getElementById('student-list').innerHTML = 
-                        `<div class="error">학생 목록 로드 실패: ${data.error}</div>`;
-                }
-            } catch (error) {
-                console.error('학생 목록 오류:', error);
-                document.getElementById('student-list').innerHTML = 
-                    `<div class="error">학생 목록 로드 오류: ${error.message}</div>`;
-            }
-        }
-    </script>
-</body>
-</html>
