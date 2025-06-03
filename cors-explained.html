@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORS 문제 완전 이해 가이드</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 15px;
+        }
+
+        h2 {
+            color: #e74c3c;
+            font-size: 1.8em;
+            margin-top: 40px;
+            margin-bottom: 20px;
+            border-left: 5px solid #e74c3c;
+            padding-left: 15px;
+        }
+
+        h3 {
+            color: #27ae60;
+            font-size: 1.4em;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+
+        .concept-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 10px;
+            margin: 20px 0;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .concept-box h3 {
+            color: white;
+            margin-top: 0;
+            font-size: 1.5em;
+        }
+
+        .problem-box {
+            background: #ffebee;
+            border-left: 5px solid #e74c3c;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+
+        .solution-box {
+            background: #e8f5e8;
+            border-left: 5px solid #27ae60;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+
+        .code-block {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            margin: 15px 0;
+            overflow-x: auto;
+            border-left: 4px solid #4299e1;
+        }
+
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .before, .after {
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .before {
+            background: #ffebee;
+            border: 2px solid #e74c3c;
+        }
+
+        .after {
+            background: #e8f5e8;
+            border: 2px solid #27ae60;
+        }
+
+        .flow-diagram {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .flow-step {
+            display: inline-block;
+            background: #3498db;
+            color: white;
+            padding: 15px 20px;
+            margin: 10px;
+            border-radius: 25px;
+            font-weight: bold;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+
+        .arrow {
+            font-size: 2em;
+            color: #7f8c8d;
+            margin: 0 10px;
+        }
+
+        .highlight {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+
+        .final-result {
+            background: linear-gradient(135deg, #00b894, #00a085);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin: 30px 0;
+            text-align: center;
+        }
+
+        .final-result h2 {
+            color: white;
+            border: none;
+            padding: 0;
+            margin-bottom: 20px;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .feature-card {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .tech-stack {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+
+        .tech-item {
+            text-align: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 2px solid #dee2e6;
+            margin: 10px;
+            flex: 1;
+            min-width: 150px;
+        }
+
+        @media (max-width: 768px) {
+            .comparison {
+                grid-template-columns: 1fr;
+            }
+            
+            .flow-step {
+                display: block;
+                margin: 10px 0;
+            }
+            
+            .arrow {
+                transform: rotate(90deg);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔒 CORS 문제 완전 이해 가이드</h1>
+
+        <div class="concept-box">
+            <h3>🤔 CORS란 무엇인가?</h3>
+            <p><strong>CORS (Cross-Origin Resource Sharing)</strong>는 웹 브라우저의 보안 정책입니다.</p>
+            <p><strong>핵심:</strong> 다른 도메인(Origin)에서 리소스에 접근할 때 브라우저가 보안을 위해 차단하는 메커니즘</p>
+            <p><strong>Origin이란?</strong> 프로토콜 + 도메인 + 포트의 조합</p>
+            <ul>
+                <li>https://gyeoksudang.github.io (GitHub Pages)</li>
+                <li>https://script.google.com (Apps Script)</li>
+                <li>→ <strong>서로 다른 Origin이므로 CORS 정책 적용!</strong></li>
+            </ul>
+        </div>
+
+        <h2>🚨 우리 프로젝트에서 발생한 CORS 문제</h2>
+
+        <div class="problem-box">
+            <h3>문제 상황</h3>
+            <p><strong>GitHub Pages</strong> (https://gyeoksudang.github.io)에서 <strong>Apps Script</strong> (https://script.google.com)로 요청할 때:</p>
+            <div class="code-block">
+Access to fetch at 'https://script.google.com/macros/s/...' 
+from origin 'https://gyeoksudang.github.io' 
+has been blocked by CORS policy: 
+No 'Access-Control-Allow-Origin' header is present on the requested resource.
+            </div>
+        </div>
+
+        <h2>🔄 Preflight 요청이란?</h2>
+
+        <div class="concept-box">
+            <h3>Preflight 요청의 개념</h3>
+            <p>브라우저가 실제 요청을 보내기 전에 "이 요청을 보내도 괜찮은지" 미리 확인하는 과정</p>
+            
+            <div class="flow-diagram">
+                <div class="flow-step">1. Preflight 요청 (OPTIONS)</div>
+                <span class="arrow">→</span>
+                <div class="flow-step">2. 서버 응답</div>
+                <span class="arrow">→</span>
+                <div class="flow-step">3. 실제 요청 (GET/POST)</div>
+            </div>
+
+            <p><strong>Preflight가 발생하는 조건:</strong></p>
+            <ul>
+                <li>POST 요청에 <code>Content-Type: application/json</code> 헤더 포함</li>
+                <li>GET 요청에 <code>Accept: application/json</code> 헤더 포함</li>
+                <li>기타 "복잡한" 헤더들</li>
+            </ul>
+        </div>
+
+        <h2>⚡ 문제 발생 과정</h2>
+
+        <div class="flow-diagram">
+            <div style="background: #e74c3c;" class="flow-step">
+                브라우저: OPTIONS 요청<br>
+                (Preflight)
+            </div>
+            <span class="arrow">→</span>
+            <div style="background: #f39c12;" class="flow-step">
+                Apps Script:<br>
+                OPTIONS 처리 불가
+            </div>
+            <span class="arrow">→</span>
+            <div style="background: #e74c3c;" class="flow-step">
+                CORS 오류<br>
+                요청 차단
+            </div>
+        </div>
+
+        <h2>🛠️ 해결 방법</h2>
+
+        <div class="comparison">
+            <div class="before">
+                <h3>❌ 문제가 있던 코드</h3>
+                <div class="code-block">
+// 복잡한 요청 - Preflight 발생!
+fetch(url, {
+    method: 'GET',
+    mode: 'cors',
+    cache: 'no-cache',
+    headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+    }
+});
+                </div>
+                <p><strong>문제:</strong> 헤더들이 Preflight 요청을 유발</p>
+            </div>
+
+            <div class="after">
+                <h3>✅ 해결된 코드</h3>
+                <div class="code-block">
+// 단순한 요청 - Preflight 없음!
+fetch(url);
+                </div>
+                <p><strong>해결:</strong> 모든 옵션 제거로 단순 요청화</p>
+            </div>
+        </div>
+
+        <div class="solution-box">
+            <h3>핵심 해결 전략</h3>
+            <p><strong>단순한 요청(Simple Request)으로 만들기:</strong></p>
+            <ul>
+                <li>GET, POST, HEAD 메서드만 사용</li>
+                <li>복잡한 헤더 제거</li>
+                <li>Content-Type은 기본값 사용</li>
+            </ul>
+            <p><strong>결과:</strong> Preflight 요청이 발생하지 않아 CORS 문제 회피!</p>
+        </div>
+
+        <h2>🎯 최종 생성물</h2>
+
+        <div class="final-result">
+            <h2>🏆 완성된 학원 출석 체크 시스템</h2>
+            
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h4>📱 QR 코드 시스템</h4>
+                    <p>관리자가 QR 코드 생성 및 인쇄</p>
+                    <p>학생들이 스캔하여 출석 체크</p>
+                </div>
+                
+                <div class="feature-card">
+                    <h4>⏰ 자동 지각 관리</h4>
+                    <p>15분 초과시 자동 지각 처리</p>
+                    <p>부모 SMS 발송 로그 기록</p>
+                </div>
+                
+                <div class="feature-card">
+                    <h4>📊 실시간 데이터</h4>
+                    <p>구글 시트로 실시간 관리</p>
+                    <p>출석 현황 즉시 확인</p>
+                </div>
+                
+                <div class="feature-card">
+                    <h4>🆓 완전 무료</h4>
+                    <p>서버 비용 0원</p>
+                    <p>설치 및 유지보수 불필요</p>
+                </div>
+            </div>
+        </div>
+
+        <h2>🏗️ 시스템 구성 요소</h2>
+
+        <div class="tech-stack">
+            <div class="tech-item">
+                <div style="font-size: 3em;">📊</div>
+                <h4>Google Sheets</h4>
+                <p><strong>역할:</strong> 데이터베이스</p>
+                <ul style="text-align: left;">
+                    <li>학생 명단 관리</li>
+                    <li>출석 기록 저장</li>
+                    <li>실시간 데이터 동기화</li>
+                </ul>
+            </div>
+
+            <div class="tech-item">
+                <div style="font-size: 3em;">⚙️</div>
+                <h4>Apps Script</h4>
+                <p><strong>역할:</strong> 백엔드 API</p>
+                <ul style="text-align: left;">
+                    <li>학생 목록 조회</li>
+                    <li>출석 체크 처리</li>
+                    <li>지각 여부 계산</li>
+                </ul>
+            </div>
+
+            <div class="tech-item">
+                <div style="font-size: 3em;">🌐</div>
+                <h4>GitHub Pages</h4>
+                <p><strong>역할:</strong> 프론트엔드</p>
+                <ul style="text-align: left;">
+                    <li>QR 코드 생성 페이지</li>
+                    <li>학생용 출석 페이지</li>
+                    <li>무료 웹 호스팅</li>
+                </ul>
+            </div>
+        </div>
+
+        <h2>📋 실제 구현된 기능들</h2>
+
+        <div class="highlight">
+            <h3>✅ 완전히 구현된 기능</h3>
+            <ul>
+                <li><strong>QR 코드 생성:</strong> qrcodejs 라이브러리로 안정적 생성</li>
+                <li><strong>학생 목록 관리:</strong> 구글 시트에서 동적 로딩</li>
+                <li><strong>출석 체크:</strong> 원클릭 출석 처리</li>
+                <li><strong>지각 감지:</strong> 15분 기준 자동 계산</li>
+                <li><strong>중복 방지:</strong> 하루 한 번만 출석 가능</li>
+                <li><strong>실시간 동기화:</strong> 즉시 구글 시트에 반영</li>
+                <li><strong>반응형 디자인:</strong> 모바일 최적화</li>
+            </ul>
+        </div>
+
+        <div class="highlight">
+            <h3>📝 SMS 기능 현황</h3>
+            <p><strong>현재 상태:</strong> 로그 출력 단계 (실제 SMS 발송 준비 완료)</p>
+            <p><strong>구현된 것:</strong></p>
+            <ul>
+                <li>지각 감지 로직 완성</li>
+                <li>부모 전화번호 데이터 준비</li>
+                <li>SMS 발송 위치 및 로직 구현</li>
+                <li>Apps Script 로그에 발송 내역 기록</li>
+            </ul>
+            <p><strong>실제 운영시:</strong> SMS API만 연동하면 즉시 작동</p>
+        </div>
+
+        <h2>🎯 핵심 학습 포인트</h2>
+
+        <div class="concept-box">
+            <h3>💡 CORS 문제 해결의 핵심</h3>
+            <p><strong>"단순함이 최고다"</strong></p>
+            <ul>
+                <li>복잡한 fetch 옵션 → 단순한 fetch(url)</li>
+                <li>여러 헤더 설정 → 헤더 없음</li>
+                <li>Preflight 요청 발생 → Preflight 방지</li>
+            </ul>
+            
+            <p><strong>결과:</strong> 브라우저가 "단순한 요청"으로 인식하여 CORS 정책 우회!</p>
+        </div>
+
+        <div class="final-result">
+            <h2>🏆 최종 성과</h2>
+            <p><strong>완전히 작동하는 실용적인 웹 애플리케이션</strong></p>
+            <p>복잡한 서버 설정 없이도 전문적인 출석 관리 시스템 구축 성공!</p>
+            <p><strong>총 개발 비용: 0원</strong> | <strong>월 운영 비용: 0원</strong></p>
+        </div>
+    </div>
+</body>
+</html>
