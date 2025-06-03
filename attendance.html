@@ -130,72 +130,95 @@
             loadStudents();
         };
 
-        // 학생 목록 로드
-        async function loadStudents() {
-            const listDiv = document.getElementById('student-list');
-            listDiv.innerHTML = '<div class="loading">학생 목록을 불러오는 중...</div>';
-            
-            try {
-                const response = await fetch(`${APPS_SCRIPT_URL}?action=getStudents`);
-                const data = await response.json();
-                
-                if (data.success && data.students.length > 0) {
-                    listDiv.innerHTML = `
-                        <div class="student-grid">
-                            ${data.students.map(student => `
-                                <button class="student-btn" onclick="checkAttendance('${student.name}')">
-                                    ${student.name}
-                                    <br><small>${student.classTime}</small>
-                                </button>
-                            `).join('')}
-                        </div>
-                    `;
-                } else if (data.success && data.students.length === 0) {
-                    listDiv.innerHTML = '<p>오늘 수업 예정인 학생이 없습니다.</p>';
-                } else {
-                    listDiv.innerHTML = `<p class="error">학생 목록 로드 실패: ${data.error}</p>`;
-                }
-            } catch (error) {
-                listDiv.innerHTML = `<p class="error">네트워크 오류: ${error.message}</p>`;
-            }
+async function loadStudents() {
+    const listDiv = document.getElementById('student-list');
+    listDiv.innerHTML = '<div class="loading">학생 목록을 불러오는 중...</div>';
+    
+    try {
+        const response = await fetch(`${APPS_SCRIPT_URL}?action=getStudents`, {
+            method: 'GET',
+            mode: 'cors',
+            cache: 'no-cache'
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
+        
+        const data = await response.json();
+        console.log('학생 목록 응답:', data);
+        
+        if (data.success && data.students.length > 0) {
+            listDiv.innerHTML = `
+                <div class="student-grid">
+                    ${data.students.map(student => `
+                        <button class="student-btn" onclick="checkAttendance('${student.name}')">
+                            ${student.name}
+                            <br><small>${student.classTime}</small>
+                        </button>
+                    `).join('')}
+                </div>
+                <p><small>오늘 수업 예정: ${data.students.length}명</small></p>
+            `;
+        } else if (data.success && data.students.length === 0) {
+            listDiv.innerHTML = '<p>오늘 수업 예정인 학생이 없습니다.</p>';
+        } else {
+            listDiv.innerHTML = `<p class="error">학생 목록 로드 실패: ${data.error || '알 수 없는 오류'}</p>`;
+        }
+    } catch (error) {
+        console.error('학생 목록 오류:', error);
+        listDiv.innerHTML = `<p class="error">네트워크 오류: ${error.message}</p>`;
+    }
+}
 
-        // 출석 체크
-        async function checkAttendance(studentName) {
-            const resultDiv = document.getElementById('result');
-            resultDiv.innerHTML = '<div class="loading">출석 처리 중...</div>';
-            
-            try {
-                // CORS 문제 해결을 위해 GET 요청 사용
-                const response = await fetch(`${APPS_SCRIPT_URL}?action=checkAttendance&student=${encodeURIComponent(studentName)}`);
-                const data = await response.json();
-                
-                if (data.success) {
-                    const resultClass = data.status === '지각' ? 'warning' : 'success';
-                    let message = data.message;
-                    
-                    if (data.status === '지각') {
-                        message += `<br>⏰ ${data.lateMinutes}분 지각 (부모님께 알림 발송됨)`;
-                    }
-                    
-                    resultDiv.innerHTML = `<div class="result ${resultClass}">${message}</div>`;
-                    
-                    // 출석 체크 완료 후 버튼 비활성화
-                    const buttons = document.querySelectorAll('.student-btn');
-                    buttons.forEach(btn => {
-                        if (btn.textContent.includes(studentName)) {
-                            btn.style.background = '#6c757d';
-                            btn.disabled = true;
-                            btn.innerHTML = btn.innerHTML.replace(studentName, studentName + ' ✅');
-                        }
-                    });
-                } else {
-                    resultDiv.innerHTML = `<div class="result error">❌ ${data.message || data.error}</div>`;
-                }
-            } catch (error) {
-                resultDiv.innerHTML = `<div class="result error">❌ 출석 체크 실패: ${error.message}</div>`;
-            }
+async function checkAttendance(studentName) {
+    const resultDiv = document.getElementById('result');
+    resultDiv.innerHTML = '<div class="loading">출석 처리 중...</div>';
+    
+    try {
+        const url = `${APPS_SCRIPT_URL}?action=checkAttendance&student=${encodeURIComponent(studentName)}`;
+        console.log('출석 체크 URL:', url);
+        
+        const response = await fetch(url, {
+            method: 'GET',
+            mode: 'cors',
+            cache: 'no-cache'
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
+        
+        const data = await response.json();
+        console.log('출석 체크 응답:', data);
+        
+        if (data.success) {
+            const resultClass = data.status === '지각' ? 'warning' : 'success';
+            let message = data.message;
+            
+            if (data.status === '지각') {
+                message += `<br>⏰ ${data.lateMinutes}분 지각 (부모님께 알림 발송됨)`;
+            }
+            
+            resultDiv.innerHTML = `<div class="result ${resultClass}">${message}</div>`;
+            
+            // 출석 체크 완료 후 버튼 비활성화
+            const buttons = document.querySelectorAll('.student-btn');
+            buttons.forEach(btn => {
+                if (btn.textContent.includes(studentName)) {
+                    btn.style.background = '#6c757d';
+                    btn.disabled = true;
+                    btn.innerHTML = btn.innerHTML.replace(studentName, studentName + ' ✅');
+                }
+            });
+        } else {
+            resultDiv.innerHTML = `<div class="result error">❌ ${data.error || data.message || '출석 체크 실패'}</div>`;
+        }
+    } catch (error) {
+        console.error('출석 체크 오류:', error);
+        resultDiv.innerHTML = `<div class="result error">❌ 출석 체크 실패: ${error.message}</div>`;
+    }
+}
     </script>
 </body>
 </html>
