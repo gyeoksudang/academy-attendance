@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학원 출석 관리 시스템</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js"></script>
+    <style>
+        body {
+            font-family: 'Malgun Gothic', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .qr-section {
+            text-align: center;
+            margin: 30px 0;
+            padding: 20px;
+            border: 2px dashed #ddd;
+            border-radius: 10px;
+        }
+        #qrcode {
+            margin: 20px 0;
+        }
+        .info-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        .btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        .btn:hover {
+            background: #0056b3;
+        }
+        .student-list {
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .student-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            .print-section, .print-section * {
+                visibility: visible;
+            }
+            .print-section {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📚 학원 출석 관리 시스템</h1>
+            <p>오늘 날짜: <span id="today-date"></span></p>
+        </div>
+
+        <div class="qr-section print-section">
+            <h2>📱 오늘의 출석 QR 코드</h2>
+            <div id="qrcode"></div>
+            <p id="qr-info">QR 코드 생성 중...</p>
+            <button class="btn" onclick="window.print()">🖨️ QR 코드 인쇄</button>
+            <button class="btn" onclick="generateNewQR()">🔄 새 QR 코드 생성</button>
+        </div>
+
+        <div class="info-section">
+            <h3>👥 오늘 수업 예정 학생</h3>
+            <div id="student-list" class="student-list">
+                학생 목록 로딩 중...
+            </div>
+            <button class="btn" onclick="loadStudents()">🔄 학생 목록 새로고침</button>
+        </div>
+
+        <div class="info-section">
+            <h3>🔗 학생용 출석 체크 링크</h3>
+            <p>학생들이 QR 코드를 스캔하면 이동할 페이지:</p>
+            <a href="attendance.html" target="_blank" id="attendance-link">attendance.html</a>
+        </div>
+    </div>
+
+    <script>
+        // 실제 Apps Script 웹앱 URL로 교체 필요
+        const APPS_SCRIPT_URL = 'YOUR_APPS_SCRIPT_URL_HERE';
+        
+        let currentQRData = '';
+
+        // 페이지 로드시 초기화
+        window.onload = function() {
+            document.getElementById('today-date').textContent = new Date().toLocaleDateString('ko-KR');
+            generateQRCode();
+            loadStudents();
+        };
+
+        // QR 코드 생성
+        async function generateQRCode() {
+            try {
+                const response = await fetch(`${APPS_SCRIPT_URL}?action=getQRData`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentQRData = window.location.href.replace('index.html', 'attendance.html');
+                    
+                    // QR 코드 생성
+                    document.getElementById('qrcode').innerHTML = '';
+                    QRCode.toCanvas(document.getElementById('qrcode'), currentQRData, {
+                        width: 300,
+                        height: 300,
+                        colorDark: '#000000',
+                        colorLight: '#ffffff'
+                    });
+                    
+                    document.getElementById('qr-info').innerHTML = `
+                        <strong>생성일시:</strong> ${data.date}<br>
+                        <strong>QR 링크:</strong> attendance.html
+                    `;
+                } else {
+                    document.getElementById('qr-info').textContent = 'QR 코드 생성 실패: ' + data.error;
+                }
+            } catch (error) {
+                document.getElementById('qr-info').textContent = 'QR 코드 생성 오류: ' + error.message;
+            }
+        }
+
+        // 새 QR 코드 생성
+        function generateNewQR() {
+            generateQRCode();
+        }
+
+        // 학생 목록 로드
+        async function loadStudents() {
+            try {
+                const response = await fetch(`${APPS_SCRIPT_URL}?action=getStudents`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const studentListDiv = document.getElementById('student-list');
+                    
+                    if (data.students.length === 0) {
+                        studentListDiv.innerHTML = '<p>오늘 수업 예정인 학생이 없습니다.</p>';
+                    } else {
+                        studentListDiv.innerHTML = data.students.map(student => `
+                            <div class="student-item">
+                                <span><strong>${student.name}</strong></span>
+                                <span>${student.classTime} (${student.classDays})</span>
+                            </div>
+                        `).join('');
+                    }
+                } else {
+                    document.getElementById('student-list').innerHTML = '학생 목록 로드 실패: ' + data.error;
+                }
+            } catch (error) {
+                document.getElementById('student-list').innerHTML = '학생 목록 로드 오류: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>
