@@ -139,7 +139,7 @@
 
 ### 배포 방식에 따른 선택
 - **클라우드 API**: GPT-4, Gemini, Claude
-- **온프레미스/로컬**: LLaMA 3, Mistral 7B, Mixtral 8x7B, Falcon 180B
+- **로컬(자체서버)**: LLaMA 3, Mistral 7B, Mixtral 8x7B, Falcon 180B
 
 ### 성능 요구사항에 따른 선택
 - **고성능 필요**: GPT-4, Falcon 180B, Claude
